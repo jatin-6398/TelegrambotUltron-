@@ -1,107 +1,27 @@
-import os
 import telebot
+from flask import Flask, request
 
-# Retrieve environment variables
-TOKEN = os.environ.get("TOKEN")
-if not TOKEN:
-    raise ValueError("Environment variable 'TOKEN' is required. Please set it before running the bot.")
-
-try:
-    CAPITAL = int(os.environ.get("CAPITAL", "100"))
-except ValueError:
-    CAPITAL = 100  # fallback to default if invalid
-
+TOKEN = "8070069668:AAHD6Yr5DpiK7vxYsAxKmLAd1xKKZ7irRK8"
 bot = telebot.TeleBot(TOKEN)
+app = Flask(__name__)
 
-def classify(number):
-    """
-    Classify the given number into a 'Big' or 'Small' category and assign a color.
-    Big if number >= 5, Small otherwise.
-    Even numbers are 'Red', odd numbers are 'Green'.
-    
-    Returns:
-        tuple: (size, color) in string format with icons.
-    """
-    number = int(number)
-    size = "Big ☝🏻" if number >= 5 else "Small 👇🏻"
-    color = "Red 👇🏻" if number % 2 == 0 else "Green ☝🏻"
-    return size, color
-
-def predict(prng_numbers):
-    """
-    Generate a prediction suggestion based on a list of PRNG numbers.
-    It analyzes the frequency of Big/Small and Red/Green outcomes.
-    
-    Args:
-        prng_numbers (list): List of integer numbers for analysis.
-
-    Returns:
-        str: A formatted prediction suggestion message.
-    """
-    # Initialize counters for size and color.
-    size_count = {"Big": 0, "Small": 0}
-    color_count = {"Red": 0, "Green": 0}
-    
-    # Analyze each number
-    for n in prng_numbers:
-        size_info, color_info = classify(n)
-        size_key = size_info.split()[0]  # Extract key part (e.g., 'Big' or 'Small')
-        color_key = color_info.split()[0]  # Extract key part (e.g., 'Red' or 'Green')
-        size_count[size_key] += 1
-        color_count[color_key] += 1
-
-    # Determine predicted outcomes based on the counts.
-    size_suggest = max(size_count, key=size_count.get)
-    color_suggest = max(color_count, key=color_count.get)
-
-    # Confidence and bet calculation (could be refined further with real data).
-    accuracy = 80  # static for now, but can be a computed metric.
-    suggestion_type = "Highest Probability 🔥" if accuracy >= 80 else "Best Trade 💹"
-    bet_amount = int(CAPITAL * accuracy / 1000)
-
-    # Compose the suggestion message using Markdown formatting.
-    suggestion_message = (
-        f"📊 *Prediction Suggestion*\n"
-        f"Size: {size_suggest}\n"
-        f"Color: {color_suggest}\n"
-        f"Confidence: {accuracy}% 🔥\n"
-        f"Suggested Bet: ₹{bet_amount}\n"
-        f"Type: {suggestion_type}"
-    )
-
-    return suggestion_message
-
+# Handle message
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    """
-    Handle incoming Telegram messages.
-    Expects the message text to contain at least 10 digits (PRNG numbers).
-    Replies with a prediction suggestion or error message.
-    """
-    try:
-        text = message.text
-        # Extract numbers from the message text
-        numbers = [int(x) for x in text.strip().split() if x.isdigit()]
+    bot.reply_to(message, "💡 Botultron here bhai! Message mila: " + message.text)
 
-        if len(numbers) < 10:
-            bot.reply_to(
-                message, 
-                "⚠️ At least 10 PRNG numbers are required for prediction."
-            )
-            return
+# For webhook route (Render needs Flask app to stay awake)
+@app.route('/' + TOKEN, methods=['POST'])
+def getMessage():
+    bot.process_new_messages([telebot.types.Update.de_json(request.stream.read().decode("utf-8")).message])
+    return "!", 200
 
-        result = predict(numbers)
-        bot.reply_to(message, result, parse_mode='Markdown')
-    except Exception as e:
-        error_message = f"❌ Error: {str(e)}"
-        bot.reply_to(message, error_message)
-        # Optionally, log the error for further debugging
-        print("Error processing message:", e)
+@app.route("/")
+def webhook():
+    bot.remove_webhook()
+    bot.set_webhook(url='https://telegrambotultron-uhki.onrender.com/' + TOKEN)
+    return "💥 Botultron Deployed Successfully!"
 
-def main():
-    """Start the Telegram bot polling."""
-    print("🤖 Bot is running...")
-    bot.polling()
-
+# Run the app
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=10000)
